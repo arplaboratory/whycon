@@ -1,14 +1,21 @@
 <launch>
   <arg name="name" default="whycon"/>
+  <!--arg name="mav_name" default="$(env MAV_NAME)"/-->
+  <arg name="mav_name" default="hires"/>
   <arg name="targets" default="1"/>
+  <arg name="whycon_name" default="whycon"/>
 
-  <group ns="camera">
+  <!--group ns="camera">
     <node pkg="image_proc" type="image_proc" name="image_proc"/>
-  </group>
+  </group-->
 
   <node name="whycon" type="whycon" pkg="whycon" output="screen">
-    <param name="targets" value="$(arg targets)"/>
-    <param name="name" value="$(arg name)"/>
+      <param name="targets" value="$(arg targets)"/>
+      <param name="name" value="$(arg whycon_name)"/>
+      <param name="mav_name" value="$(arg mav_name)"/>
+      <param name="outer_diameter" value="0.068"/>
+      <param name="inner_diameter" value="0.035"/>
+      <rosparam file="$(find whycon)/config/copr-transportation-camera.yaml"/>
   </node>
 
   <node name="transformer" type="transformer" pkg="whycon" output="screen"/>

@@ -32,8 +32,8 @@ if(NOT DISABLE_ROS)
     tf
     nodelet
     std_srvs
-    payload_msgs
   )
+  find_package(Eigen3 REQUIRED)
 
   add_message_files(
     FILES
@@ -47,7 +47,8 @@ if(NOT DISABLE_ROS)
   catkin_package(
     INCLUDE_DIRS include
     LIBRARIES whycon
-    CATKIN_DEPENDS cv_bridge roscpp sensor_msgs std_msgs message_runtime geometry_msgs std_msgs
+    CATKIN_DEPENDS cv_bridge roscpp sensor_msgs std_msgs message_runtime geometry_msgs
+    DEPENDS EIGEN3
   )
 endif()
 
@@ -59,49 +60,38 @@ find_package(Boost COMPONENTS program_options thread system REQUIRED)
 find_package(PkgConfig)
 pkg_check_modules(YAML_CPP yaml-cpp)
 
-
-## add Eigen
-find_package(Eigen3 REQUIRED)
-include_directories(${Eigen_INCLUDE_DIRS})
-
 ### TARGETS ###
 include_directories(
-  ${catkin_INCLUDE_DIRS} ${YAML_CPP_INCLUDE_DIRS} include
+  ${catkin_INCLUDE_DIRS} ${YAML_CPP_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIR} include
 )
 
-add_library(whycon SHARED src/lib/circle_detector.cpp src/lib/many_circle_detector.cpp src/lib/localization_system.cpp src/lib/ocam_functions.cpp)
+add_library(whycon SHARED src/lib/circle_detector.cpp src/lib/many_circle_detector.cpp src/lib/localization_system.cpp)
 target_link_libraries(whycon ${OpenCV_LIBS} ${Boost_LIBRARIES})
 
 if(NOT DISABLE_ROS)
   add_executable(whycon-node src/ros/whycon_node.cpp src/ros/whycon_ros.cpp)
   set_target_properties(whycon-node PROPERTIES OUTPUT_NAME whycon)
 
-  add_library(whycon_nodelet src/ros/whycon_nodelet.cpp src/ros/whycon_ros.cpp)
+  #add_library(whycon_nodelet src/ros/whycon_nodelet.cpp src/ros/whycon_ros.cpp)
 
   add_executable(set_axis src/ros/set_axis_node.cpp src/ros/set_axis.cpp)
   #add_executable(triangulator src/ros/triangulator_node.cpp src/ros/triangulator.cpp)
-  add_executable(robot_pose_publisher src/ros/robot_pose_publisher.cpp src/ros/robot_pose_publisher_node.cpp)
-  add_executable(vicon_publisher src/ros/vicon_publisher.cpp src/ros/vicon_publisher_node.cpp)
-  add_executable(comparer src/ros/comparer.cpp src/ros/comparer_node.cpp)
+  add_executable(robot_pose_publisher src/ros/robot_pose_publisher.cpp src/ros/robot_pose_publisher_node.cpp)  
   add_executable(transformer src/ros/transformer.cpp src/ros/transformer_node.cpp)
 
   add_dependencies(whycon-node whycon_generate_messages_cpp)
-  add_dependencies(whycon_nodelet whycon_generate_messages_cpp)
+  #add_dependencies(whycon_nodelet whycon_generate_messages_cpp)
   add_dependencies(set_axis whycon_generate_messages_cpp)
   #add_dependencies(triangulator whycon_generate_messages_cpp)
   add_dependencies(robot_pose_publisher whycon_generate_messages_cpp)
-  add_dependencies(vicon_publisher whycon_generate_messages_cpp)
-  add_dependencies(comparer whycon_generate_messages_cpp)
   add_dependencies(transformer whycon_generate_messages_cpp)
 
   target_link_libraries(whycon-node ${catkin_LIBRARIES} ${YAML_CPP_LIBRARIES} whycon)
-  target_link_libraries(whycon_nodelet ${catkin_LIBRARIES} ${YAML_CPP_LIBRARIES} whycon)
+  #target_link_libraries(whycon_nodelet ${catkin_LIBRARIES} ${YAML_CPP_LIBRARIES} whycon)
   target_link_libraries(set_axis ${catkin_LIBRARIES} ${YAML_CPP_LIBRARIES} whycon)
   target_link_libraries(transformer ${catkin_LIBRARIES} ${YAML_CPP_LIBRARIES} whycon)
   #target_link_libraries(triangulator ${catkin_LIBRARIES} whycon)
   target_link_libraries(robot_pose_publisher ${catkin_LIBRARIES} whycon)
-  target_link_libraries(vicon_publisher ${catkin_LIBRARIES} whycon)
-  target_link_libraries(comparer ${catkin_LIBRARIES} whycon)
 else()
   add_executable(whycon-main src/main.cpp)
   set_target_properties(whycon-main PROPERTIES OUTPUT_NAME whycon)
@@ -119,16 +109,16 @@ if(NOT DISABLE_ROS)
     DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
   )
   ## Mark executables and/or libraries for installation
-  install(TARGETS whycon whycon-node robot_pose_publisher vicon_publisher comparer #triangulator
+  install(TARGETS whycon whycon-node robot_pose_publisher #triangulator
     ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
     LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
     RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
   )
 
   ## Mark executables and/or libraries for installation
-  install(FILES nodelets.xml
-    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-  )
+  #install(FILES nodelets.xml
+  #  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+  #)
 else()
   install(TARGETS whycon DESTINATION lib)
   install(TARGETS whycon-main camera-calibrator DESTINATION bin)
