@@ -4,6 +4,7 @@
 #include <tf/tf.h>
 #include <sstream>
 #include <geometry_msgs/PoseArray.h>
+#include <geometry_msgs/Vector3Stamped.h>
 #include <yaml-cpp/yaml.h>
 #include <whycon/Projection.h>
 #include "whycon_ros.h"
@@ -62,7 +63,8 @@ whycon::WhyConROS::WhyConROS(ros::NodeHandle& n) : is_tracking(false), should_re
   
   image_pub = n.advertise<sensor_msgs::Image>("image_out", 1);
   poses_pub = n.advertise<geometry_msgs::PoseArray>("poses", 1);
-  transformed_poses_pub = n.advertise<geometry_msgs::PoseArray>("transformed_poses", 1);
+  transformed_poses_pub = n.advertise<geometry_msgs::Vector3Stamped>("transformed_poses", 1);
+  //transformed_poses_pub = n.advertise<geometry_msgs::PoseArray>("transformed_poses", 1);
   context_pub = n.advertise<sensor_msgs::Image>("context", 1);
 	projection_pub = n.advertise<whycon::Projection>("projection", 1);
 
@@ -108,8 +110,9 @@ void whycon::WhyConROS::publish_results(const std_msgs::Header& header, const cv
 {
   bool publish_images = (image_pub.getNumSubscribers() != 0);
   bool publish_poses = (poses_pub.getNumSubscribers() != 0);
+  bool transformed_publish_poses = (transformed_poses_pub.getNumSubscribers() != 0);
   
-  if (!publish_images && !publish_poses) return;
+  if (!publish_images && !transformed_publish_poses) return;
   
   // prepare image output
   cv::Mat output_image;
@@ -118,6 +121,7 @@ void whycon::WhyConROS::publish_results(const std_msgs::Header& header, const cv
 
   geometry_msgs::PoseArray pose_array;
   geometry_msgs::PoseArray transformed_pose_array;
+  geometry_msgs::Vector3Stamped transformed_p;
   
   // go through detected targets
   for (int i = 0; i < system->targets; i++) {
@@ -136,21 +140,21 @@ void whycon::WhyConROS::publish_results(const std_msgs::Header& header, const cv
 			cv::circle(output_image, camera_model.project3dToPixel(cv::Point3d(coord)), 1, cv::Scalar(255,0,255), 1, CV_AA);
     }
 
-    if (publish_poses) {
+    if (transformed_publish_poses) {
       geometry_msgs::Pose p;
-      geometry_msgs::Pose transformed_p;
+      //geometry_msgs::Pose transformed_p;
       Eigen::Vector3f position(pose.pos(0), pose.pos(1), pose.pos(2));
       Eigen::Vector3f pos_robot = RCB_*position + tCB_;
-      transformed_p.position.x = pos_robot(0);//position in camera frame.
-      transformed_p.position.y = pos_robot(1);
-      transformed_p.position.z = pos_robot(2);
-      transformed_p.orientation = tf::createQuaternionMsgFromRollPitchYaw(0, pose.rot(0), pose.rot(1));
+      transformed_p.vector.x = pos_robot(0);//position in camera frame.
+      transformed_p.vector.y = pos_robot(1);
+      transformed_p.vector.z = pos_robot(2);
+      //transformed_p.orientation = tf::createQuaternionMsgFromRollPitchYaw(0, pose.rot(0), pose.rot(1));
       p.position.x = pose.pos(0);
       p.position.y = pose.pos(1);
       p.position.z = pose.pos(2);
       p.orientation = tf::createQuaternionMsgFromRollPitchYaw(0, pose.rot(0), pose.rot(1));
       pose_array.poses.push_back(p);
-      transformed_pose_array.poses.push_back(transformed_p);
+      //transformed_pose_array.poses.push_back(transformed_p);
     }
   }
 
@@ -160,13 +164,13 @@ void whycon::WhyConROS::publish_results(const std_msgs::Header& header, const cv
     image_pub.publish(output_image_bridge);
   }
 
-  if (publish_poses) {
+  if (transformed_publish_poses) {
     pose_array.header = header;
     pose_array.header.frame_id = frame_id;
-    transformed_pose_array.header = header;
-    transformed_pose_array.header.frame_id = frame_id;
+    transformed_p.header = header;
+    transformed_p.header.frame_id = frame_id;
     poses_pub.publish(pose_array);
-    transformed_poses_pub.publish(transformed_pose_array);
+    transformed_poses_pub.publish(transformed_p);
   }
 
   if (transformation_loaded)
