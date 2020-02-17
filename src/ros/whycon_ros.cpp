@@ -33,19 +33,21 @@ whycon::WhyConROS::WhyConROS(ros::NodeHandle& n) : is_tracking(false), should_re
 	n.getParam("ratio_tolerance", parameters.ratio_tolerance);
 	n.getParam("max_eccentricity", parameters.max_eccentricity);
 
-  n.param("Transformation/RCB/xx",  RCB_(0,0), 0.000601f);
-  n.param("Transformation/RCB/xy", RCB_(0,1), 0.0f);
-  n.param("Transformation/RCB/xz", RCB_(0,2), 0.0f);
-  n.param("Transformation/RCB/yx", RCB_(1,0), 0.0f);
-  n.param("Transformation/RCB/yy",  RCB_(1,1), 0.000589f);
-  n.param("Transformation/RCB/yz", RCB_(1,2), 0.0f);
-  n.param("Transformation/RCB/zx", RCB_(2,0), 0.0f);
-  n.param("Transformation/RCB/zy", RCB_(2,1), 0.0f);
-  n.param("Transformation/RCB/zz",  RCB_(2,2), 0.001076f);
+        n.param("cable_length",  cable_length_, 1.0);
 
-  n.param("Transformation/tCB/x", tCB_(0), 0.0f);
-  n.param("Transformation/tCB/y", tCB_(1), 0.0f);
-  n.param("Transformation/tCB/z", tCB_(2), 0.001076f);
+        n.param("Transformation/RCB/xx",  RCB_(0,0), 0.000601f);
+        n.param("Transformation/RCB/xy", RCB_(0,1), 0.0f);
+        n.param("Transformation/RCB/xz", RCB_(0,2), 0.0f);
+        n.param("Transformation/RCB/yx", RCB_(1,0), 0.0f);
+        n.param("Transformation/RCB/yy",  RCB_(1,1), 0.000589f);
+        n.param("Transformation/RCB/yz", RCB_(1,2), 0.0f);
+        n.param("Transformation/RCB/zx", RCB_(2,0), 0.0f);
+        n.param("Transformation/RCB/zy", RCB_(2,1), 0.0f);
+        n.param("Transformation/RCB/zz",  RCB_(2,2), 0.001076f);
+      
+        n.param("Transformation/tCB/x", tCB_(0), 0.0f);
+        n.param("Transformation/tCB/y", tCB_(1), 0.0f);
+        n.param("Transformation/tCB/z", tCB_(2), 0.001076f);
 
 	ROS_INFO_STREAM("RCB is " << RCB_(0,0) << ", " << RCB_(0,1) <<  ", " << RCB_(0,2));
 	ROS_INFO_STREAM("       " << RCB_(1,0) << ", " << RCB_(1,1) <<  ", " << RCB_(1,2));
@@ -127,7 +129,21 @@ void whycon::WhyConROS::publish_results(const std_msgs::Header& header, const cv
   for (int i = 0; i < system->targets; i++) {
     const whycon::CircleDetector::Circle& circle = system->get_circle(i);
     whycon::LocalizationSystem::Pose pose = system->get_pose(circle);
+    double point2D[2] = {system->get_circle(i).y, system->get_circle(i).x};
+    std::cout << "point 2d results:" << point2D[0] << " " << point2D[1] << std::endl;
+    std::cout << "system results:" << system->get_circle(i).y << " " << system->get_circle(i).x << std::endl;
+    double circle_cen_norm = sqrt(std::pow(point2D[0],2) + std::pow(point2D[1],2));
+    Eigen::Vector3f direction_camFrame(point2D[1]/circle_cen_norm,point2D[0]/circle_cen_norm,1/circle_cen_norm);
+    // rotate from camera frame to quad frame
+    Eigen::Vector3f direction_bodyFrame = RCB_ * direction_camFrame;
+
+    // calculate distance camera-load
+    double b_term = 2 * tCB_.dot(direction_bodyFrame);
+    double c_term = tCB_.dot(tCB_) - std::pow(cable_length_,2);
+    double dist = (-b_term + sqrt(b_term * b_term - 4 * c_term)) / 2;
+
     cv::Vec3f coord = pose.pos;
+    Eigen::Vector3f relative_position_bodyFrame = tCB_ + dist * direction_bodyFrame; //calculate direction in quad frame
 
     // draw each target
     if (publish_images) {
@@ -145,9 +161,13 @@ void whycon::WhyConROS::publish_results(const std_msgs::Header& header, const cv
       //geometry_msgs::Pose transformed_p;
       Eigen::Vector3f position(pose.pos(0), pose.pos(1), pose.pos(2));
       Eigen::Vector3f pos_robot = RCB_*position + tCB_;
-      transformed_p.vector.x = pos_robot(0);//position in camera frame.
-      transformed_p.vector.y = pos_robot(1);
-      transformed_p.vector.z = pos_robot(2);
+      //transformed_p.vector.x = pos_robot(0);//position in camera frame.
+      //transformed_p.vector.y = pos_robot(1);
+      //transformed_p.vector.z = pos_robot(2);
+      transformed_p.vector.x = relative_position_bodyFrame(0);//position in camera frame.
+      transformed_p.vector.y = relative_position_bodyFrame(1);
+      transformed_p.vector.z = relative_position_bodyFrame(2);
+
       //transformed_p.orientation = tf::createQuaternionMsgFromRollPitchYaw(0, pose.rot(0), pose.rot(1));
       p.position.x = pose.pos(0);
       p.position.y = pose.pos(1);

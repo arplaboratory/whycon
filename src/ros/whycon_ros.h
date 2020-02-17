@@ -32,6 +32,7 @@ namespace whycon {
       std::string world_frame_id, frame_id;
       int targets;
       double xscale, yscale;
+      double cable_length_;
 
       std::vector<double> projection;
       tf::Transform similarity;
