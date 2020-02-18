@@ -31,10 +31,11 @@ namespace whycon {
       int max_attempts, max_refine;
       std::string world_frame_id, frame_id;
       int targets;
-      double xscale, yscale;
-      double cable_length_;
+      double xscale, yscale,cam_center_x,cam_center_y;
+      double cable_length_,focal_length_; 
 
       std::vector<double> projection;
+      std::vector<double> camera_matrix;
       tf::Transform similarity;
 
       image_transport::ImageTransport it;

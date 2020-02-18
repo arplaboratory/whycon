@@ -54,6 +54,12 @@ whycon::WhyConROS::WhyConROS(ros::NodeHandle& n) : is_tracking(false), should_re
 	ROS_INFO_STREAM("       " << RCB_(2,0) << ", " << RCB_(2,1) <<  ", " << RCB_(2,2));
                                      
 	ROS_INFO_STREAM("tCB is " << tCB_(0) << ", " << tCB_(1) <<  ", " << tCB_(2));
+	std::vector<double> vec{0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+        n.param("camera_matrix/data", camera_matrix, vec);
+	cam_center_x = camera_matrix[2];
+	cam_center_y = camera_matrix[5];
+	focal_length_ = camera_matrix[0];
 	load_transforms();
 	transform_broadcaster = boost::make_shared<tf::TransformBroadcaster>();
 
@@ -129,10 +135,10 @@ void whycon::WhyConROS::publish_results(const std_msgs::Header& header, const cv
   for (int i = 0; i < system->targets; i++) {
     const whycon::CircleDetector::Circle& circle = system->get_circle(i);
     whycon::LocalizationSystem::Pose pose = system->get_pose(circle);
-    double point2D[2] = {system->get_circle(i).y, system->get_circle(i).x};
-    std::cout << "point 2d results:" << point2D[0] << " " << point2D[1] << std::endl;
-    std::cout << "system results:" << system->get_circle(i).y << " " << system->get_circle(i).x << std::endl;
-    double circle_cen_norm = sqrt(std::pow(point2D[0],2) + std::pow(point2D[1],2));
+    double point2D[2] = {system->get_circle(i).y-cam_center_y, system->get_circle(i).x-cam_center_x};
+    //std::cout << "point 2d results:" << point2D[0] << " " << point2D[1] << std::endl;
+    //std::cout << "system results:" << system->get_circle(i).y << " " << system->get_circle(i).x << std::endl;
+    double circle_cen_norm = sqrt(std::pow(focal_length_,2) +std::pow(point2D[0],2) + std::pow(point2D[1],2));
     Eigen::Vector3f direction_camFrame(point2D[1]/circle_cen_norm,point2D[0]/circle_cen_norm,1/circle_cen_norm);
     // rotate from camera frame to quad frame
     Eigen::Vector3f direction_bodyFrame = RCB_ * direction_camFrame;
