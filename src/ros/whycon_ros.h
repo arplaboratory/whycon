@@ -32,7 +32,7 @@ namespace whycon {
       std::string world_frame_id, frame_id;
       int targets;
       double xscale, yscale,cam_center_x,cam_center_y;
-      double cable_length_,focal_length_; 
+      double cable_length_,focal_length_y_,focal_length_x_; 
 
       std::vector<double> projection;
       std::vector<double> camera_matrix;
