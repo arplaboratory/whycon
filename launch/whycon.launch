@@ -1,24 +1,24 @@
 <launch>
   <arg name="name" default="whycon"/>
   <!--arg name="mav_name" default="$(env MAV_NAME)"/-->
-  <arg name="mav_name" default="dragonfly2"/>
+  <arg name="mav_name" default="dragonfly3"/>
   <arg name="targets" default="1"/>
   <arg name="whycon_name" default="whycon"/>
 
-  <!--node pkg="image_proc" type="image_proc" name="image_proc">
-      <remap from="image_raw" to="$(arg mav_name)/image_raw"/>
-      <remap from="cam_info" to="$(arg mav_name)/cam_info"/>
-      <remap from="image_rect" to="$(arg mav_name)/image_rect"/>
+  <!--node pkg="nodelet" type="nodelet" name="rectify" args="standalone image_proc/rectify" ns="/$(arg mav_name)">
+    <remap from="image_mono" to="/$(arg mav_name)/image_raw"/>
+    <remap from="camera_info" to="/$(arg mav_name)/camera_info"/>
   </node-->
 
   <node name="whycon" type="whycon" pkg="whycon" output="screen">
       <param name="targets" value="$(arg targets)"/>
       <param name="name" value="$(arg whycon_name)"/>
       <param name="mav_name" value="$(arg mav_name)"/>
-      <param name="outer_diameter" value="0.068"/>
-      <param name="inner_diameter" value="0.035"/>
+      <param name="outer_diameter" value="0.070"/>
+      <param name="inner_diameter" value="0.0175"/>
       <rosparam file="$(find whycon)/config/copr-transportation-camera.yaml"/>
       <rosparam file="$(find system_launch)/config/copr-transportation/$(arg mav_name)/hires.yaml"/>
+      <rosparam file="$(find system_launch)/config/copr-transportation/$(arg mav_name)/robot_payload_gains.yaml"/>
   </node>
 
   <node name="transformer" type="transformer" pkg="whycon" output="screen"/>

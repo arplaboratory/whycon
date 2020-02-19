@@ -40,9 +40,7 @@ whycon::WhyConROS::WhyConROS(ros::NodeHandle& n) : is_tracking(false), should_re
         n.param("Transformation/RCB/xz", RCB_(0,2), 0.0f);
         n.param("Transformation/RCB/yx", RCB_(1,0), 0.0f);
         n.param("Transformation/RCB/yy",  RCB_(1,1), 0.000589f);
-        n.param("Transformation/RCB/yz", RCB_(1,2), 0.0f);
-        n.param("Transformation/RCB/zx", RCB_(2,0), 0.0f);
-        n.param("Transformation/RCB/zy", RCB_(2,1), 0.0f);
+        n.param("Transformation/RCB/yz", RCB_(1,2), 0.0f); n.param("Transformation/RCB/zx", RCB_(2,0), 0.0f); n.param("Transformation/RCB/zy", RCB_(2,1), 0.0f);
         n.param("Transformation/RCB/zz",  RCB_(2,2), 0.001076f);
       
         n.param("Transformation/tCB/x", tCB_(0), 0.0f);
@@ -54,13 +52,14 @@ whycon::WhyConROS::WhyConROS(ros::NodeHandle& n) : is_tracking(false), should_re
 	ROS_INFO_STREAM("       " << RCB_(2,0) << ", " << RCB_(2,1) <<  ", " << RCB_(2,2));
                                      
 	ROS_INFO_STREAM("tCB is " << tCB_(0) << ", " << tCB_(1) <<  ", " << tCB_(2));
-	std::vector<double> vec{0, 0, 0, 0, 0, 0, 0, 0, 0};
+	std::vector<double> vec{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
-        n.param("camera_matrix/data", camera_matrix, vec);
+        n.param("projection_matrix/data", camera_matrix, vec);
 	cam_center_x = camera_matrix[2];
-	cam_center_y = camera_matrix[5];
+	cam_center_y = camera_matrix[6];
 	focal_length_x_ = camera_matrix[0];
-	focal_length_y_ = camera_matrix[4];
+	focal_length_y_ = camera_matrix[5];
+	ROS_INFO_STREAM("cable_length is " << cable_length_ << "cam_center_x is " << cam_center_x << "cam_center_y is , " << cam_center_y <<  "focal_length_x_, " << focal_length_x_ << "focal_length_y_, " << focal_length_y_);
 	load_transforms();
 	transform_broadcaster = boost::make_shared<tf::TransformBroadcaster>();
 
@@ -69,10 +68,12 @@ whycon::WhyConROS::WhyConROS(ros::NodeHandle& n) : is_tracking(false), should_re
   n.param("input_queue_size", input_queue_size, input_queue_size);
   //cam_sub = it.subscribeCamera("/camera/image_raw", input_queue_size, boost::bind(&WhyConROS::on_image, this, _1, _2));
   cam_sub = it.subscribeCamera("/"+mav_name+"/image_raw", input_queue_size, boost::bind(&WhyConROS::on_image, this, _1, _2));
+  //cam_sub = it.subscribeCamera("/"+mav_name+"/image_rect", input_queue_size, boost::bind(&WhyConROS::on_image, this, _1, _2));
   
   image_pub = n.advertise<sensor_msgs::Image>("image_out", 1);
   poses_pub = n.advertise<geometry_msgs::PoseArray>("poses", 1);
   transformed_poses_pub = n.advertise<geometry_msgs::Vector3Stamped>("transformed_poses", 1);
+  original_transformed_poses_pub = n.advertise<geometry_msgs::Vector3Stamped>("original_transformed_poses", 1);
   //transformed_poses_pub = n.advertise<geometry_msgs::PoseArray>("transformed_poses", 1);
   context_pub = n.advertise<sensor_msgs::Image>("context", 1);
 	projection_pub = n.advertise<whycon::Projection>("projection", 1);
@@ -86,6 +87,7 @@ void whycon::WhyConROS::on_image(const sensor_msgs::ImageConstPtr& image_msg, co
   if (camera_model.fullResolution().width == 0) { ROS_ERROR_STREAM("camera is not calibrated!"); return; }
 
   cv_bridge::CvImageConstPtr cv_ptr = cv_bridge::toCvShare(image_msg, "rgb8");
+  //cv_bridge::CvImageConstPtr cv_ptr = cv_bridge::toCvShare(image_msg, "mono8");
   const cv::Mat& image = cv_ptr->image;
 
   if (!system)
@@ -131,14 +133,16 @@ void whycon::WhyConROS::publish_results(const std_msgs::Header& header, const cv
   geometry_msgs::PoseArray pose_array;
   geometry_msgs::PoseArray transformed_pose_array;
   geometry_msgs::Vector3Stamped transformed_p;
+  geometry_msgs::Vector3Stamped original_transformed_p;
   
   // go through detected targets
   for (int i = 0; i < system->targets; i++) {
     const whycon::CircleDetector::Circle& circle = system->get_circle(i);
     whycon::LocalizationSystem::Pose pose = system->get_pose(circle);
     double point2D[2] = {(system->get_circle(i).y-cam_center_y)/focal_length_y_, (system->get_circle(i).x-cam_center_x)/focal_length_x_};
+    //double point2D[2] = {(system->get_circle(i).y-243.144)/274.931, (system->get_circle(i).x-319.625)/275.078};
     //std::cout << "point 2d results:" << point2D[0] << " " << point2D[1] << std::endl;
-    //std::cout << "system results:" << system->get_circle(i).y << " " << system->get_circle(i).x << std::endl;
+    //std::cout << "system results:"  << system->get_circle(i).x << " " << system->get_circle(i).y << std::endl;
     double circle_cen_norm = sqrt(1 +std::pow(point2D[0],2) + std::pow(point2D[1],2));
     Eigen::Vector3f direction_camFrame(point2D[1]/circle_cen_norm,point2D[0]/circle_cen_norm,1/circle_cen_norm);
     // rotate from camera frame to quad frame
@@ -151,6 +155,8 @@ void whycon::WhyConROS::publish_results(const std_msgs::Header& header, const cv
 
     cv::Vec3f coord = pose.pos;
     Eigen::Vector3f relative_position_bodyFrame = tCB_ + dist * direction_bodyFrame; //calculate direction in quad frame
+    Eigen::Vector3f cv_relative_position_camFrame = dist * direction_camFrame; //calculate direction in quad frame
+    std::cout << "dist results:" << dist << std::endl;
 
     // draw each target
     if (publish_images) {
@@ -160,27 +166,39 @@ void whycon::WhyConROS::publish_results(const std_msgs::Header& header, const cv
       circle.draw(output_image, ostr.str(), cv::Vec3b(0,255,255));
 			/*whycon::CircleDetector::Circle new_circle = circle.improveEllipse(cv_ptr->image);
 			new_circle.draw(output_image, ostr.str(), cv::Vec3b(0,255,0));*/
-			cv::circle(output_image, camera_model.project3dToPixel(cv::Point3d(coord)), 1, cv::Scalar(255,0,255), 1, CV_AA);
+			//cv::circle(output_image, camera_model.project3dToPixel(cv::Point3d(coord)), 1, cv::Scalar(0,255,255), 1, CV_AA);
+      cv::Point projected_points = camera_model.project3dToPixel(cv::Point3d(coord));
+      //std::cout << projected_points.x << " " << projected_points.y << std::endl; 
+      //cv::Point constraint_projected_points = camera_model.project3dToPixel(cv::Point3d(cv_relative_position_camFrame[0],cv_relative_position_camFrame[1],cv_relative_position_camFrame[2]));
+      //std::cout << "constraint: "<< constraint_projected_points.x << " " << constraint_projected_points.y << std::endl; 
+			cv::circle(output_image, camera_model.project3dToPixel(cv::Point3d(cv_relative_position_camFrame[0],cv_relative_position_camFrame[1],cv_relative_position_camFrame[2])), 1, cv::Scalar(0,0,255), 1, CV_AA);
+			//cv::circle(output_image, cv::Point((int)system->get_circle(i).x,(int)system->get_circle(i).y), 1, cv::Scalar(255,0,0), 1, CV_AA);
     }
 
     if (transformed_publish_poses) {
       geometry_msgs::Pose p;
+      geometry_msgs::Pose p_constraint;
       //geometry_msgs::Pose transformed_p;
       Eigen::Vector3f position(pose.pos(0), pose.pos(1), pose.pos(2));
       Eigen::Vector3f pos_robot = RCB_*position + tCB_;
-      //transformed_p.vector.x = pos_robot(0);//position in camera frame.
-      //transformed_p.vector.y = pos_robot(1);
-      //transformed_p.vector.z = pos_robot(2);
+      original_transformed_p.vector.x = pos_robot(0);//position in camera frame.
+      original_transformed_p.vector.y = pos_robot(1);
+      original_transformed_p.vector.z = pos_robot(2);
       transformed_p.vector.x = relative_position_bodyFrame(0);//position in camera frame.
       transformed_p.vector.y = relative_position_bodyFrame(1);
       transformed_p.vector.z = relative_position_bodyFrame(2);
 
       //transformed_p.orientation = tf::createQuaternionMsgFromRollPitchYaw(0, pose.rot(0), pose.rot(1));
+      p_constraint.position.x = cv_relative_position_camFrame(0);
+      p_constraint.position.y = cv_relative_position_camFrame(1);
+      p_constraint.position.z = cv_relative_position_camFrame(2);
+      p_constraint.orientation = tf::createQuaternionMsgFromRollPitchYaw(0, pose.rot(0), pose.rot(1));
       p.position.x = pose.pos(0);
       p.position.y = pose.pos(1);
       p.position.z = pose.pos(2);
       p.orientation = tf::createQuaternionMsgFromRollPitchYaw(0, pose.rot(0), pose.rot(1));
       pose_array.poses.push_back(p);
+      pose_array.poses.push_back(p_constraint);
       //transformed_pose_array.poses.push_back(transformed_p);
     }
   }
@@ -198,6 +216,7 @@ void whycon::WhyConROS::publish_results(const std_msgs::Header& header, const cv
     transformed_p.header.frame_id = frame_id;
     poses_pub.publish(pose_array);
     transformed_poses_pub.publish(transformed_p);
+    original_transformed_poses_pub.publish(original_transformed_p);
   }
 
   if (transformation_loaded)
