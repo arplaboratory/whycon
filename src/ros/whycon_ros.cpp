@@ -140,7 +140,8 @@ void whycon::WhyConROS::publish_results(const std_msgs::Header& header, const cv
     const whycon::CircleDetector::Circle& circle = system->get_circle(i);
     whycon::LocalizationSystem::Pose pose = system->get_pose(circle);
     double detected_length_ = sqrt(std::pow(pose.pos(0),2)+std::pow(pose.pos(1),2) + std::pow(pose.pos(2),2));
-    if(abs(detected_length_-cable_length_)<0.5){
+    if((circle.valid)&&(detected_length_-cable_length_<0.2)&&(detected_length_-cable_length_)>-0.2){
+        //std::cout << "target id is "  << i << " and the difference is " << detected_length_-cable_length_ << std::endl;
         double point2D[2] = {(system->get_circle(i).y-cam_center_y)/focal_length_y_, (system->get_circle(i).x-cam_center_x)/focal_length_x_};
         //double point2D[2] = {(system->get_circle(i).y-243.144)/274.931, (system->get_circle(i).x-319.625)/275.078};
         //std::cout << "point 2d results:" << point2D[0] << " " << point2D[1] << std::endl;

@@ -53,7 +53,8 @@ bool whycon::ManyCircleDetector::detect(const cv::Mat& input, bool reset, int ma
           if (detectors[i].get_threshold() == prev_threshold) break; /* threshold converged, no more refinment possible */
         }
       }
-
+      
+      //std::cout << "detecting circle " << i << std::endl;
       if (circles[i].valid) {
         WHYCON_DEBUG("detection of circle " << i << " ok");
         last_valid_circles[i] = circles[i];
@@ -62,6 +63,7 @@ bool whycon::ManyCircleDetector::detect(const cv::Mat& input, bool reset, int ma
         /* inser segment_ids corresponding to inner and outer parts of the valid circle detected */
         context.valid_segment_ids.insert(context.total_segments - 1);
         context.valid_segment_ids.insert(context.total_segments - 2);
+        //all_detected = true;
 
         break; /* detection was successful, dont keep trying */
       }
@@ -74,7 +76,8 @@ bool whycon::ManyCircleDetector::detect(const cv::Mat& input, bool reset, int ma
     cv::waitKey();*/
 
     /* detection was not possible for this circle, so no other circles will be found, thus abort search */
-    if (!circles[i].valid) { all_detected = false; break; }
+    //if (!circles[i].valid) { all_detected = false; break; }
+    if (!circles[i].valid) { break; }
   }
 
   //int64_t ticks = cv::getTickCount();
