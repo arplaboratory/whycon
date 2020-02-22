@@ -202,6 +202,14 @@ void whycon::WhyConROS::publish_results(const std_msgs::Header& header, const cv
             p.orientation = tf::createQuaternionMsgFromRollPitchYaw(0, pose.rot(0), pose.rot(1));
             pose_array.poses.push_back(p);
             pose_array.poses.push_back(p_constraint);
+
+            pose_array.header = header;
+            pose_array.header.frame_id = frame_id;
+            transformed_p.header = header;
+            transformed_p.header.frame_id = frame_id;
+            poses_pub.publish(pose_array);
+            transformed_poses_pub.publish(transformed_p);
+            original_transformed_poses_pub.publish(original_transformed_p);
             //transformed_pose_array.poses.push_back(transformed_p);
           }
       }
@@ -213,7 +221,7 @@ void whycon::WhyConROS::publish_results(const std_msgs::Header& header, const cv
     image_pub.publish(output_image_bridge);
   }
 
-  if (transformed_publish_poses) {
+  /*if (transformed_publish_poses) {
     pose_array.header = header;
     pose_array.header.frame_id = frame_id;
     transformed_p.header = header;
@@ -221,7 +229,7 @@ void whycon::WhyConROS::publish_results(const std_msgs::Header& header, const cv
     poses_pub.publish(pose_array);
     transformed_poses_pub.publish(transformed_p);
     original_transformed_poses_pub.publish(original_transformed_p);
-  }
+  }*/
 
   if (transformation_loaded)
   {
