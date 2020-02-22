@@ -156,7 +156,6 @@ void whycon::WhyConROS::publish_results(const std_msgs::Header& header, const cv
     cv::Vec3f coord = pose.pos;
     Eigen::Vector3f relative_position_bodyFrame = tCB_ + dist * direction_bodyFrame; //calculate direction in quad frame
     Eigen::Vector3f cv_relative_position_camFrame = dist * direction_camFrame; //calculate direction in quad frame
-    std::cout << "dist results:" << dist << std::endl;
 
     // draw each target
     if (publish_images) {
