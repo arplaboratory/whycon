@@ -212,6 +212,9 @@ void whycon::WhyConROS::publish_results(const std_msgs::Header& header, const cv
             original_transformed_poses_pub.publish(original_transformed_p);
             //transformed_pose_array.poses.push_back(transformed_p);
           }
+      }else{
+	  should_reset = true;
+	  return;
       }
   }
 
