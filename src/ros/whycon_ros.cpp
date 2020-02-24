@@ -99,6 +99,7 @@ void whycon::WhyConROS::on_image(const sensor_msgs::ImageConstPtr& image_msg, co
     publish_results(image_msg->header, cv_ptr);
     should_reset = false;
   }
+
   else if (image_pub.getNumSubscribers() != 0)
     image_pub.publish(cv_ptr);
 
