@@ -8,6 +8,7 @@
 #include <yaml-cpp/yaml.h>
 #include <whycon/Projection.h>
 #include "whycon_ros.h"
+#include <std_srvs/Trigger.h>
 
 whycon::WhyConROS::WhyConROS(ros::NodeHandle& n) : is_tracking(false), should_reset(true), it(n)
 {
@@ -79,6 +80,7 @@ whycon::WhyConROS::WhyConROS(ros::NodeHandle& n) : is_tracking(false), should_re
 	projection_pub = n.advertise<whycon::Projection>("projection", 1);
 
   reset_service = n.advertiseService("reset", &WhyConROS::reset, this);
+  emergency_land_client = n.serviceClient<std_srvs::Trigger>("/payload/mav_services/Loadland");
 }
 
 void whycon::WhyConROS::on_image(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::CameraInfoConstPtr& info_msg)
@@ -101,6 +103,14 @@ void whycon::WhyConROS::on_image(const sensor_msgs::ImageConstPtr& image_msg, co
   }
   else if (image_pub.getNumSubscribers() != 0)
     image_pub.publish(cv_ptr);
+  
+  double current_time = image_msg->header.stamp.toSec();
+  if(current_time - last_pub_time > 1.0){
+   std_srvs::Trigger trig;
+   emergency_land_client.call(trig); 
+   ROS_INFO("Entering emergency landing");
+  }
+
 
   if (context_pub.getNumSubscribers() != 0) {
     cv_bridge::CvImage cv_img_context;
@@ -210,6 +220,7 @@ void whycon::WhyConROS::publish_results(const std_msgs::Header& header, const cv
             poses_pub.publish(pose_array);
             transformed_poses_pub.publish(transformed_p);
             original_transformed_poses_pub.publish(original_transformed_p);
+	    last_pub_time = header.stamp.toSec();
             //transformed_pose_array.poses.push_back(transformed_p);
           }
       }else{

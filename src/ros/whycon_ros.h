@@ -33,6 +33,7 @@ namespace whycon {
       int targets;
       double xscale, yscale,cam_center_x,cam_center_y;
       double cable_length_,focal_length_y_,focal_length_x_; 
+      double last_pub_time;
 
       std::vector<double> projection;
       std::vector<double> camera_matrix;
@@ -41,6 +42,7 @@ namespace whycon {
       image_transport::ImageTransport it;
       image_transport::CameraSubscriber cam_sub;
       ros::ServiceServer reset_service;
+      ros::ServiceClient emergency_land_client;
 
       ros::Publisher image_pub, poses_pub, context_pub, projection_pub, transformed_poses_pub, original_transformed_poses_pub;
       boost::shared_ptr<tf::TransformBroadcaster>	transform_broadcaster;
