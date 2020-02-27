@@ -8,6 +8,8 @@
 #include <yaml-cpp/yaml.h>
 #include <whycon/Projection.h>
 #include "whycon_ros.h"
+#include <std_srvs/Trigger.h>
+#include <std_msgs/Bool.h>
 
 whycon::WhyConROS::WhyConROS(ros::NodeHandle& n) : is_tracking(false), should_reset(true), it(n)
 {
@@ -65,13 +67,16 @@ whycon::WhyConROS::WhyConROS(ros::NodeHandle& n) : is_tracking(false), should_re
 
   /* initialize ros */
   int input_queue_size = 1;
+  copr_status_ = 0;
   n.param("input_queue_size", input_queue_size, input_queue_size);
   //cam_sub = it.subscribeCamera("/camera/image_raw", input_queue_size, boost::bind(&WhyConROS::on_image, this, _1, _2));
   cam_sub = it.subscribeCamera("/"+mav_name+"/image_raw", input_queue_size, boost::bind(&WhyConROS::on_image, this, _1, _2));
+  copr_status_sub = n.subscribe("copr_status", 10, &WhyConROS::copr_status_callback,this);
   //cam_sub = it.subscribeCamera("/"+mav_name+"/image_rect", input_queue_size, boost::bind(&WhyConROS::on_image, this, _1, _2));
   
   image_pub = n.advertise<sensor_msgs::Image>("image_out", 1);
   poses_pub = n.advertise<geometry_msgs::PoseArray>("poses", 1);
+  emergency_pub = n.advertise<std_msgs::Bool>("whycon_emergency", 1);
   transformed_poses_pub = n.advertise<geometry_msgs::Vector3Stamped>("transformed_poses", 1);
   original_transformed_poses_pub = n.advertise<geometry_msgs::Vector3Stamped>("original_transformed_poses", 1);
   //transformed_poses_pub = n.advertise<geometry_msgs::PoseArray>("transformed_poses", 1);
@@ -79,6 +84,21 @@ whycon::WhyConROS::WhyConROS(ros::NodeHandle& n) : is_tracking(false), should_re
 	projection_pub = n.advertise<whycon::Projection>("projection", 1);
 
   reset_service = n.advertiseService("reset", &WhyConROS::reset, this);
+  //emergency_land_client = n.serviceClient<std_srvs::Trigger>("/payload/mav_services/Loadland");
+}
+
+
+void whycon::WhyConROS::copr_status_callback(const std_msgs::UInt8::ConstPtr &msg){
+
+     copr_status_ = msg->data;
+     if(copr_status_ == 1){
+       ROS_INFO("whycon::Taking off");}
+     else if(copr_status_ == 3){
+       ROS_INFO("whycon::Enabling cooperative control");
+     }else if(copr_status_ == 2){
+       ROS_INFO("whycon::Landing");
+     }
+
 }
 
 void whycon::WhyConROS::on_image(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::CameraInfoConstPtr& info_msg)
@@ -102,6 +122,18 @@ void whycon::WhyConROS::on_image(const sensor_msgs::ImageConstPtr& image_msg, co
 
   else if (image_pub.getNumSubscribers() != 0)
     image_pub.publish(cv_ptr);
+  
+  double current_time = image_msg->header.stamp.toSec();
+  //std::cout << current_time - last_pub_time << std::endl;
+  if((current_time - last_pub_time > 0.5)&&(copr_status_ == 3)){
+   //std_srvs::Trigger trig;
+   //emergency_land_client.call(trig); 
+   std_msgs::Bool emergency;
+   emergency.data = true;
+   emergency_pub.publish(emergency);
+   ROS_INFO("Entering emergency landing");
+  }
+
 
   if (context_pub.getNumSubscribers() != 0) {
     cv_bridge::CvImage cv_img_context;
@@ -211,6 +243,7 @@ void whycon::WhyConROS::publish_results(const std_msgs::Header& header, const cv
             poses_pub.publish(pose_array);
             transformed_poses_pub.publish(transformed_p);
             original_transformed_poses_pub.publish(original_transformed_p);
+	    last_pub_time = header.stamp.toSec();
             //transformed_pose_array.poses.push_back(transformed_p);
           }
       }else{
