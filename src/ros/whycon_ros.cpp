@@ -76,6 +76,7 @@ whycon::WhyConROS::WhyConROS(ros::NodeHandle& n) : is_tracking(false), should_re
   
   image_pub = n.advertise<sensor_msgs::Image>("image_out", 1);
   poses_pub = n.advertise<geometry_msgs::PoseArray>("poses", 1);
+  elapsed_time_pub = n.advertise<std_msgs::Float32>("detection_elapsed_time", 1);
   emergency_pub = n.advertise<std_msgs::Bool>("whycon_emergency", 1);
   transformed_poses_pub = n.advertise<geometry_msgs::Vector3Stamped>("transformed_poses", 1);
   original_transformed_poses_pub = n.advertise<geometry_msgs::Vector3Stamped>("original_transformed_poses", 1);
@@ -113,7 +114,15 @@ void whycon::WhyConROS::on_image(const sensor_msgs::ImageConstPtr& image_msg, co
   if (!system)
     system = boost::make_shared<whycon::LocalizationSystem>(targets, image.size().width, image.size().height, cv::Mat(camera_model.fullIntrinsicMatrix()), cv::Mat(camera_model.distortionCoeffs()), parameters);
 
-  is_tracking = system->localize(image, should_reset/*!is_tracking*/, max_attempts, max_refine);
+   std::chrono::time_point<std::chrono::system_clock> start, end; 
+   start = std::chrono::system_clock::now(); 
+   is_tracking = system->localize(image, should_reset/*!is_tracking*/, max_attempts, max_refine);
+   end = std::chrono::system_clock::now(); 
+   std::chrono::duration<float> elapsed_seconds = end - start; 
+   std::cout << "elapsed time: " << elapsed_seconds.count() << "s\n"; 
+   std_msgs::Float32 elapsed_time;
+   elapsed_time.data = elapsed_seconds.count();
+   elapsed_time_pub.publish(elapsed_time);
 
   if (is_tracking) {
     publish_results(image_msg->header, cv_ptr);
