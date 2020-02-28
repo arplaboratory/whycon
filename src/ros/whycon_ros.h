@@ -11,6 +11,7 @@
 #include <std_msgs/UInt8.h>
 #include <std_msgs/Float32.h>
 #include <Eigen/Geometry>
+#include <chrono>
 
 namespace whycon {
   class WhyConROS {
@@ -36,6 +37,7 @@ namespace whycon {
       double xscale, yscale,cam_center_x,cam_center_y;
       double cable_length_,focal_length_y_,focal_length_x_; 
       double last_pub_time;
+      std::chrono::time_point<std::chrono::system_clock> last_image_income_time;
 
       std::vector<double> projection;
       std::vector<double> camera_matrix;
@@ -48,7 +50,7 @@ namespace whycon {
       ros::ServiceServer reset_service;
       ros::ServiceClient emergency_land_client;
 
-      ros::Publisher elapsed_time_pub, image_pub, poses_pub, context_pub, projection_pub, transformed_poses_pub, original_transformed_poses_pub, emergency_pub;
+      ros::Publisher image_elapsed_time_pub, elapsed_time_pub, image_pub, poses_pub, context_pub, projection_pub, transformed_poses_pub, original_transformed_poses_pub, emergency_pub;
       boost::shared_ptr<tf::TransformBroadcaster>	transform_broadcaster;
 
       image_geometry::PinholeCameraModel camera_model;

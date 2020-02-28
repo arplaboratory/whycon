@@ -10,18 +10,19 @@
 #include "whycon_ros.h"
 #include <std_srvs/Trigger.h>
 #include <std_msgs/Bool.h>
+#include <chrono>
 
 whycon::WhyConROS::WhyConROS(ros::NodeHandle& n) : is_tracking(false), should_reset(true), it(n)
 {
 	transformation_loaded = false;
 	similarity.setIdentity();
 
-  if (!n.getParam("targets", targets)) throw std::runtime_error("Private parameter \"targets\" is missing");
-
-  n.param("name", frame_id, std::string("whycon"));
-  n.param("world_frame", world_frame_id, std::string("world"));
-  n.param("max_attempts", max_attempts, 1);
-  n.param("max_refine", max_refine, 1);
+        if (!n.getParam("targets", targets)) throw std::runtime_error("Private parameter \"targets\" is missing");
+      
+        n.param("name", frame_id, std::string("whycon"));
+        n.param("world_frame", world_frame_id, std::string("world"));
+        n.param("max_attempts", max_attempts, 1);
+        n.param("max_refine", max_refine, 1);
 
 	n.getParam("outer_diameter", parameters.outer_diameter);
 	n.getParam("inner_diameter", parameters.inner_diameter);
@@ -77,6 +78,7 @@ whycon::WhyConROS::WhyConROS(ros::NodeHandle& n) : is_tracking(false), should_re
   image_pub = n.advertise<sensor_msgs::Image>("image_out", 1);
   poses_pub = n.advertise<geometry_msgs::PoseArray>("poses", 1);
   elapsed_time_pub = n.advertise<std_msgs::Float32>("detection_elapsed_time", 1);
+  image_elapsed_time_pub = n.advertise<std_msgs::Float32>("image_elapsed_time", 1);
   emergency_pub = n.advertise<std_msgs::Bool>("whycon_emergency", 1);
   transformed_poses_pub = n.advertise<geometry_msgs::Vector3Stamped>("transformed_poses", 1);
   original_transformed_poses_pub = n.advertise<geometry_msgs::Vector3Stamped>("original_transformed_poses", 1);
@@ -116,13 +118,17 @@ void whycon::WhyConROS::on_image(const sensor_msgs::ImageConstPtr& image_msg, co
 
    std::chrono::time_point<std::chrono::system_clock> start, end; 
    start = std::chrono::system_clock::now(); 
+   std::chrono::duration<float> image_elapsed_seconds = start - last_image_income_time; 
    is_tracking = system->localize(image, should_reset/*!is_tracking*/, max_attempts, max_refine);
    end = std::chrono::system_clock::now(); 
    std::chrono::duration<float> elapsed_seconds = end - start; 
-   std::cout << "elapsed time: " << elapsed_seconds.count() << "s\n"; 
-   std_msgs::Float32 elapsed_time;
+   //std::cout << "image elapsed time: " << image_elapsed_seconds.count() << "s\n"; 
+   //std::cout << "detection elapsed time: " << elapsed_seconds.count() << "s\n"; 
+   std_msgs::Float32 elapsed_time,image_elapsed_time;
    elapsed_time.data = elapsed_seconds.count();
+   image_elapsed_time.data = image_elapsed_seconds.count();
    elapsed_time_pub.publish(elapsed_time);
+   image_elapsed_time_pub.publish(image_elapsed_time);
 
   if (is_tracking) {
     publish_results(image_msg->header, cv_ptr);
@@ -143,6 +149,7 @@ void whycon::WhyConROS::on_image(const sensor_msgs::ImageConstPtr& image_msg, co
    ROS_INFO("Entering emergency landing");
   }
 
+  last_image_income_time = start;
 
   if (context_pub.getNumSubscribers() != 0) {
     cv_bridge::CvImage cv_img_context;
