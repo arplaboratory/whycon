@@ -38,6 +38,7 @@ if(NOT DISABLE_ROS)
   add_message_files(
     FILES
     Projection.msg
+    ElapseTime.msg
   )
 
   generate_messages(

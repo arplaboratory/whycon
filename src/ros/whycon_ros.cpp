@@ -7,6 +7,7 @@
 #include <geometry_msgs/Vector3Stamped.h>
 #include <yaml-cpp/yaml.h>
 #include <whycon/Projection.h>
+#include <whycon/ElapseTime.h>
 #include "whycon_ros.h"
 #include <std_srvs/Trigger.h>
 #include <std_msgs/Bool.h>
@@ -77,8 +78,8 @@ whycon::WhyConROS::WhyConROS(ros::NodeHandle& n) : is_tracking(false), should_re
   
   image_pub = n.advertise<sensor_msgs::Image>("image_out", 1);
   poses_pub = n.advertise<geometry_msgs::PoseArray>("poses", 1);
-  elapsed_time_pub = n.advertise<std_msgs::Float32>("detection_elapsed_time", 1);
-  image_elapsed_time_pub = n.advertise<std_msgs::Float32>("image_elapsed_time", 1);
+  elapsed_time_pub = n.advertise<whycon::ElapseTime>("detection_elapsed_time", 1);
+  image_elapsed_time_pub = n.advertise<whycon::ElapseTime>("image_elapsed_time", 1);
   emergency_pub = n.advertise<std_msgs::Bool>("whycon_emergency", 1);
   transformed_poses_pub = n.advertise<geometry_msgs::Vector3Stamped>("transformed_poses", 1);
   original_transformed_poses_pub = n.advertise<geometry_msgs::Vector3Stamped>("original_transformed_poses", 1);
@@ -124,9 +125,11 @@ void whycon::WhyConROS::on_image(const sensor_msgs::ImageConstPtr& image_msg, co
    std::chrono::duration<float> elapsed_seconds = end - start; 
    //std::cout << "image elapsed time: " << image_elapsed_seconds.count() << "s\n"; 
    //std::cout << "detection elapsed time: " << elapsed_seconds.count() << "s\n"; 
-   std_msgs::Float32 elapsed_time,image_elapsed_time;
-   elapsed_time.data = elapsed_seconds.count();
-   image_elapsed_time.data = image_elapsed_seconds.count();
+   whycon::ElapseTime elapsed_time,image_elapsed_time;
+   elapsed_time.elapsed_time.data = elapsed_seconds.count();
+   image_elapsed_time.elapsed_time.data = image_elapsed_seconds.count();
+   elapsed_time.header = image_msg->header;
+   image_elapsed_time.header = image_msg->header;
    elapsed_time_pub.publish(elapsed_time);
    image_elapsed_time_pub.publish(image_elapsed_time);
 
