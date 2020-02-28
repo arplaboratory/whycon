@@ -77,7 +77,7 @@ whycon::WhyConROS::WhyConROS(ros::NodeHandle& n) : is_tracking(false), should_re
   original_transformed_poses_pub = n.advertise<geometry_msgs::Vector3Stamped>("original_transformed_poses", 1);
   //transformed_poses_pub = n.advertise<geometry_msgs::PoseArray>("transformed_poses", 1);
   context_pub = n.advertise<sensor_msgs::Image>("context", 1);
-	projection_pub = n.advertise<whycon::Projection>("projection", 1);
+  projection_pub = n.advertise<whycon::Projection>("projection", 1);
 
   reset_service = n.advertiseService("reset", &WhyConROS::reset, this);
   emergency_land_client = n.serviceClient<std_srvs::Trigger>("/payload/mav_services/Loadland");
