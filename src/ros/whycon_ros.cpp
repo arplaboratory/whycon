@@ -120,18 +120,21 @@ void whycon::WhyConROS::on_image(const sensor_msgs::ImageConstPtr& image_msg, co
    std::chrono::time_point<std::chrono::system_clock> start, end; 
    start = std::chrono::system_clock::now(); 
    std::chrono::duration<float> image_elapsed_seconds = start - last_image_income_time; 
+   whycon::ElapseTime image_elapsed_time;
+   image_elapsed_time.elapsed_time.data = image_elapsed_seconds.count();
+   image_elapsed_time.header = image_msg->header;
+   image_elapsed_time_pub.publish(image_elapsed_time);
+   last_image_income_time = start;
+
    is_tracking = system->localize(image, should_reset/*!is_tracking*/, max_attempts, max_refine);
    end = std::chrono::system_clock::now(); 
    std::chrono::duration<float> elapsed_seconds = end - start; 
    //std::cout << "image elapsed time: " << image_elapsed_seconds.count() << "s\n"; 
    //std::cout << "detection elapsed time: " << elapsed_seconds.count() << "s\n"; 
-   whycon::ElapseTime elapsed_time,image_elapsed_time;
+   whycon::ElapseTime elapsed_time;
    elapsed_time.elapsed_time.data = elapsed_seconds.count();
-   image_elapsed_time.elapsed_time.data = image_elapsed_seconds.count();
    elapsed_time.header = image_msg->header;
-   image_elapsed_time.header = image_msg->header;
    elapsed_time_pub.publish(elapsed_time);
-   image_elapsed_time_pub.publish(image_elapsed_time);
 
   if (is_tracking) {
     publish_results(image_msg->header, cv_ptr);
@@ -152,7 +155,6 @@ void whycon::WhyConROS::on_image(const sensor_msgs::ImageConstPtr& image_msg, co
    ROS_INFO("Entering emergency landing");
   }
 
-  last_image_income_time = start;
 
   if (context_pub.getNumSubscribers() != 0) {
     cv_bridge::CvImage cv_img_context;
@@ -161,6 +163,7 @@ void whycon::WhyConROS::on_image(const sensor_msgs::ImageConstPtr& image_msg, co
     system->detector.context.debug_buffer(cv_ptr->image, cv_img_context.image);
     context_pub.publish(cv_img_context.toImageMsg());
   }
+
 }
 
 bool whycon::WhyConROS::reset(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response)
