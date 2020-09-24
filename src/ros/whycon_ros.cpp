@@ -44,7 +44,9 @@ whycon::WhyConROS::WhyConROS(ros::NodeHandle& n) : is_tracking(false), should_re
         n.param("Transformation/RCB/xz", RCB_(0,2), 0.0f);
         n.param("Transformation/RCB/yx", RCB_(1,0), 0.0f);
         n.param("Transformation/RCB/yy",  RCB_(1,1), 0.000589f);
-        n.param("Transformation/RCB/yz", RCB_(1,2), 0.0f); n.param("Transformation/RCB/zx", RCB_(2,0), 0.0f); n.param("Transformation/RCB/zy", RCB_(2,1), 0.0f);
+        n.param("Transformation/RCB/yz", RCB_(1,2), 0.0f); 
+	n.param("Transformation/RCB/zx", RCB_(2,0), 0.0f); 
+	n.param("Transformation/RCB/zy", RCB_(2,1), 0.0f);
         n.param("Transformation/RCB/zz",  RCB_(2,2), 0.001076f);
       
         n.param("Transformation/tCB/x", tCB_(0), 0.0f);
@@ -145,7 +147,6 @@ void whycon::WhyConROS::on_image(const sensor_msgs::ImageConstPtr& image_msg, co
     image_pub.publish(cv_ptr);
   
   double current_time = image_msg->header.stamp.toSec();
-  //std::cout << current_time - last_pub_time << std::endl;
   if((current_time - last_pub_time > 0.5)&&(copr_status_ == 3)){
    //std_srvs::Trigger trig;
    //emergency_land_client.call(trig); 
