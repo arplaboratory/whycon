@@ -11,6 +11,7 @@ namespace whycon {
       ~ManyCircleDetector(void);
       
       bool detect(const cv::Mat& image, bool reset = false, int max_attempts = 1, int refine_max_step = 1);
+      bool set_tag_pos(double predict_circle_x, double predict_circle_y);
       
       std::vector<CircleDetector::Circle> circles, last_valid_circles;
 
@@ -18,6 +19,8 @@ namespace whycon {
       
     private:
       int width, height, number_of_circles;
+      double estimated_last_circle_x, estimated_last_circle_y;
+      bool estimated_last_circle_update;
       std::vector<CircleDetector> detectors;
   };
 }

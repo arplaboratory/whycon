@@ -10,6 +10,7 @@
 #include <tf/transform_broadcaster.h>
 #include <std_msgs/UInt8.h>
 #include <std_msgs/Float32.h>
+#include <geometry_msgs/Vector3Stamped.h>
 #include <Eigen/Geometry>
 #include <chrono>
 
@@ -36,6 +37,7 @@ namespace whycon {
       int targets,copr_status_;
       double xscale, yscale,cam_center_x,cam_center_y;
       double cable_length_,focal_length_y_,focal_length_x_; 
+      double predict_circle_y, predict_circle_x;
       double last_pub_time;
       std::chrono::time_point<std::chrono::system_clock> last_image_income_time;
 
@@ -43,10 +45,12 @@ namespace whycon {
       std::vector<double> camera_matrix;
       tf::Transform similarity;
       void copr_status_callback(const std_msgs::UInt8::ConstPtr &msg);
+      void qvec_callback(const geometry_msgs::Vector3Stamped::ConstPtr &msg);
 
       image_transport::ImageTransport it;
       image_transport::CameraSubscriber cam_sub;
       ros::Subscriber copr_status_sub;
+      ros::Subscriber estimated_tag_pos_sub;
       ros::ServiceServer reset_service;
       ros::ServiceClient emergency_land_client;
 

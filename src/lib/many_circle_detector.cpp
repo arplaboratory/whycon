@@ -8,9 +8,17 @@ whycon::ManyCircleDetector::ManyCircleDetector(int _number_of_circles, int _widt
   circles.resize(number_of_circles);
   last_valid_circles.resize(number_of_circles);
   detectors.resize(number_of_circles, CircleDetector(width, height, &context, parameters));
+  estimated_last_circle_update = false;
 }
 
 whycon::ManyCircleDetector::~ManyCircleDetector(void) {
+}
+
+bool whycon::ManyCircleDetector::set_tag_pos(double predict_circle_x, double predict_circle_y){
+     estimated_last_circle_x = predict_circle_x;
+     estimated_last_circle_y = predict_circle_y;
+     estimated_last_circle_update = true;
+     return true;
 }
 
 bool whycon::ManyCircleDetector::detect(const cv::Mat& input, bool reset, int max_attempts, int refine_max_step)
@@ -26,6 +34,11 @@ bool whycon::ManyCircleDetector::detect(const cv::Mat& input, bool reset, int ma
     
     for (int j = 0; j < max_attempts; j++) {
       WHYCON_DEBUG("attempt " << j);
+      if((i == 0)&&estimated_last_circle_update){
+        cout << "using estimated last circle" << endl;
+	last_valid_circles[i].x = estimated_last_circle_x;
+	last_valid_circles[i].y = estimated_last_circle_y;
+      }
       circles[i] = last_valid_circles[i]; /* start from last known valid circle's position */
 
       bool fast_cleanup_possible;
@@ -76,8 +89,8 @@ bool whycon::ManyCircleDetector::detect(const cv::Mat& input, bool reset, int ma
     cv::waitKey();*/
 
     /* detection was not possible for this circle, so no other circles will be found, thus abort search */
-    //if (!circles[i].valid) { all_detected = false; break; }
-    if (!circles[i].valid) { break; }
+    if (!circles[i].valid) { all_detected = false; break; }
+    //if (!circles[i].valid) { break; }
   }
 
   //int64_t ticks = cv::getTickCount();

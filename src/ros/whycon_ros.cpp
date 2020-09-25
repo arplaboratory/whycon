@@ -76,6 +76,7 @@ whycon::WhyConROS::WhyConROS(ros::NodeHandle& n) : is_tracking(false), should_re
   //cam_sub = it.subscribeCamera("/camera/image_raw", input_queue_size, boost::bind(&WhyConROS::on_image, this, _1, _2));
   cam_sub = it.subscribeCamera("/"+mav_name+"/image_raw", input_queue_size, boost::bind(&WhyConROS::on_image, this, _1, _2));
   copr_status_sub = n.subscribe("copr_status", 10, &WhyConROS::copr_status_callback,this);
+  estimated_tag_pos_sub = n.subscribe("/"+mav_name+"/tag_pos_body", 10, &WhyConROS::qvec_callback,this);
   //cam_sub = it.subscribeCamera("/"+mav_name+"/image_rect", input_queue_size, boost::bind(&WhyConROS::on_image, this, _1, _2));
   
   image_pub = n.advertise<sensor_msgs::Image>("image_out", 1);
@@ -107,6 +108,19 @@ void whycon::WhyConROS::copr_status_callback(const std_msgs::UInt8::ConstPtr &ms
 
 }
 
+void whycon::WhyConROS::qvec_callback(const geometry_msgs::Vector3Stamped::ConstPtr &msg){
+     
+     Eigen::Vector3f tag_pos_bodyFrame(msg->vector.x,msg->vector.y,msg->vector.z);
+     Eigen::Vector3f tag_pos_camFrame;
+     tag_pos_camFrame =  RCB_.transpose() * (tag_pos_bodyFrame - tCB_) ;
+     predict_circle_y = focal_length_y_ * tag_pos_camFrame(1)/tag_pos_camFrame(2)+cam_center_y; 
+     predict_circle_x = focal_length_x_ * tag_pos_camFrame(0)/tag_pos_camFrame(2)+cam_center_x; 
+     bool estimated_tag_pos_updated = true;
+     system->detector.set_tag_pos(predict_circle_x, predict_circle_y);
+     std::cout << "The predicted circle is " << predict_circle_x << ", " << predict_circle_y << std::endl;
+
+}
+
 void whycon::WhyConROS::on_image(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::CameraInfoConstPtr& info_msg)
 {
   camera_model.fromCameraInfo(info_msg);
@@ -115,6 +129,15 @@ void whycon::WhyConROS::on_image(const sensor_msgs::ImageConstPtr& image_msg, co
   cv_bridge::CvImageConstPtr cv_ptr = cv_bridge::toCvShare(image_msg, "rgb8");
   //cv_bridge::CvImageConstPtr cv_ptr = cv_bridge::toCvShare(image_msg, "mono8");
   const cv::Mat& image = cv_ptr->image;
+  //const cv::Mat& image_raw = cv_ptr->image;
+  //cv::resize(image,image,cv::Size(image.cols/2,image.rows/2));
+  cv::Mat output_image;
+  output_image = cv_ptr->image.clone();
+  cv_bridge::CvImage output_image_bridge = *cv_ptr;
+  output_image_bridge.image = output_image;
+  cv::Point pt1 = cv::Point(predict_circle_x, predict_circle_y);
+  cv::circle(output_image, pt1, 1, cv::Scalar(0,0,255), 1, CV_AA);
+  image_pub.publish(output_image_bridge);
 
   if (!system)
     system = boost::make_shared<whycon::LocalizationSystem>(targets, image.size().width, image.size().height, cv::Mat(camera_model.fullIntrinsicMatrix()), cv::Mat(camera_model.distortionCoeffs()), parameters);
@@ -129,6 +152,7 @@ void whycon::WhyConROS::on_image(const sensor_msgs::ImageConstPtr& image_msg, co
    last_image_income_time = start;
 
    is_tracking = system->localize(image, should_reset/*!is_tracking*/, max_attempts, max_refine);
+   //is_tracking = system->localize(image, !is_tracking, max_attempts, max_refine);
    end = std::chrono::system_clock::now(); 
    std::chrono::duration<float> elapsed_seconds = end - start; 
    //std::cout << "image elapsed time: " << image_elapsed_seconds.count() << "s\n"; 
@@ -139,12 +163,10 @@ void whycon::WhyConROS::on_image(const sensor_msgs::ImageConstPtr& image_msg, co
    elapsed_time_pub.publish(elapsed_time);
 
   if (is_tracking) {
+    std::cout << "is_tracking is " << is_tracking << "\n"; 
     publish_results(image_msg->header, cv_ptr);
     should_reset = false;
   }
-
-  else if (image_pub.getNumSubscribers() != 0)
-    image_pub.publish(cv_ptr);
   
   double current_time = image_msg->header.stamp.toSec();
   if((current_time - last_pub_time > 0.5)&&(copr_status_ == 3)){
@@ -152,7 +174,7 @@ void whycon::WhyConROS::on_image(const sensor_msgs::ImageConstPtr& image_msg, co
    //emergency_land_client.call(trig); 
    std_msgs::Bool emergency;
    emergency.data = true;
-   emergency_pub.publish(emergency);
+   //emergency_pub.publish(emergency);
    ROS_INFO("Entering emergency landing");
   }
 
@@ -175,7 +197,8 @@ bool whycon::WhyConROS::reset(std_srvs::Empty::Request& request, std_srvs::Empty
 
 void whycon::WhyConROS::publish_results(const std_msgs::Header& header, const cv_bridge::CvImageConstPtr& cv_ptr)
 {
-  bool publish_images = (image_pub.getNumSubscribers() != 0);
+  //bool publish_images = (image_pub.getNumSubscribers() != 0);
+  bool publish_images = false;
   bool publish_poses = (poses_pub.getNumSubscribers() != 0);
   bool transformed_publish_poses = (transformed_poses_pub.getNumSubscribers() != 0);
   
@@ -226,7 +249,7 @@ void whycon::WhyConROS::publish_results(const std_msgs::Header& header, const cv
 			/*whycon::CircleDetector::Circle new_circle = circle.improveEllipse(cv_ptr->image);
 			new_circle.draw(output_image, ostr.str(), cv::Vec3b(0,255,0));*/
 			//cv::circle(output_image, camera_model.project3dToPixel(cv::Point3d(coord)), 1, cv::Scalar(0,255,255), 1, CV_AA);
-          cv::Point projected_points = camera_model.project3dToPixel(cv::Point3d(coord));
+          //cv::Point projected_points = camera_model.project3dToPixel(cv::Point3d(coord));
           //std::cout << projected_points.x << " " << projected_points.y << std::endl; 
           //cv::Point constraint_projected_points = camera_model.project3dToPixel(cv::Point3d(cv_relative_position_camFrame[0],cv_relative_position_camFrame[1],cv_relative_position_camFrame[2]));
           //std::cout << "constraint: "<< constraint_projected_points.x << " " << constraint_projected_points.y << std::endl; 
